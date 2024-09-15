@@ -48,7 +48,7 @@ m61_memory_buffer::~m61_memory_buffer() {
 void* m61_malloc(size_t sz, const char* file, int line) {
     (void) file, (void) line;   // avoid uninitialized variable warnings
     // Your code here.
-    if (default_buffer.pos + sz > default_buffer.size) {
+    if ((double) default_buffer.pos + (double) sz > default_buffer.size) {
         // Not enough space left in default buffer for allocation
         myStats.nfail++;
         myStats.fail_size += sz;
@@ -56,21 +56,26 @@ void* m61_malloc(size_t sz, const char* file, int line) {
     }
 
     // Otherwise there is enough space; claim the next `sz` bytes
-
-
-
     void* ptr = &default_buffer.buffer[default_buffer.pos];
     allocation_pool[ptr] = sz;
-    default_buffer.pos += alignof(std::max_align_t);
+    if(sz < alignof(std::max_align_t)) {
+        default_buffer.pos += alignof(std::max_align_t);
+
+    } else {
+        default_buffer.pos += sz;
+    }
+
 
         
     myStats.nactive++;
     myStats.active_size += sz;
     myStats.ntotal++;
     myStats.total_size += sz;
-    if ((uintptr_t) ptr + sz > myStats.heap_max) {
+    if (!myStats.heap_min || myStats.heap_min > (uintptr_t) ptr) {
+        myStats.heap_min = (uintptr_t) ptr;
+    }
+    if (!myStats.heap_max || myStats.heap_max < (uintptr_t) ptr + sz) {
         myStats.heap_max = (uintptr_t) ptr + sz;
-
     }
     
     return ptr;
@@ -86,19 +91,22 @@ void* m61_malloc(size_t sz, const char* file, int line) {
 void m61_free(void* ptr, const char* file, int line) {
     // avoid uninitialized variable warnings
     (void) ptr, (void) file, (void) line;
+
     // Your code here. The handout code does nothing!
     if (ptr == nullptr) {
 
         return ;
     }
 
+    size_t sz = allocation_pool[ptr];
+
     myStats.nactive--;
-    myStats.active_size -= allocation_pool[ptr];
-    if ((uintptr_t) ptr + allocation_pool[ptr] >= myStats.heap_max) {
-        myStats.heap_max = (uintptr_t) ptr - 1;
+    myStats.active_size -= sz;
+    if (!myStats.heap_min || myStats.heap_min > (uintptr_t) ptr) {
+        myStats.heap_min = (uintptr_t) ptr;
     }
-    if ((uintptr_t) ptr <= myStats.heap_min) {
-        myStats.heap_min = (uintptr_t) ptr + alignof(std::max_align_t);
+    if (!myStats.heap_max || myStats.heap_max < (uintptr_t) ptr + sz) {
+        myStats.heap_max = (uintptr_t) ptr + sz;
     }
     // myStats.ntotal++;
     // myStats.total_size += sz;
@@ -115,6 +123,12 @@ void m61_free(void* ptr, const char* file, int line) {
 
 void* m61_calloc(size_t count, size_t sz, const char* file, int line) {
     // Your code here (not needed for first tests).
+    size_t total = count * sz;
+    if(count == 0 || sz == 0 || (sz != 0 && total/sz != count)) {
+        myStats.nfail++;
+        myStats.fail_size += total;
+        return nullptr;
+    }
     void* ptr = m61_malloc(count * sz, file, line);
     if (ptr) {
         memset(ptr, 0, count * sz);

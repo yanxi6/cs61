@@ -6,6 +6,7 @@
 #include <cinttypes>
 #include <cassert>
 #include <sys/mman.h>
+#include <map>
 
 
 struct m61_memory_buffer {
@@ -18,6 +19,9 @@ struct m61_memory_buffer {
 };
 
 static m61_memory_buffer default_buffer;
+
+static m61_statistics myStats = {0,0,0,0,0,0,0,0};
+static std::map<void*, size_t> allocation_pool;
 
 
 m61_memory_buffer::m61_memory_buffer() {
@@ -35,8 +39,6 @@ m61_memory_buffer::~m61_memory_buffer() {
 }
 
 
-
-
 /// m61_malloc(sz, file, line)
 ///    Returns a pointer to `sz` bytes of freshly-allocated dynamic memory.
 ///    The memory is not initialized. If `sz == 0`, then m61_malloc may
@@ -48,12 +50,29 @@ void* m61_malloc(size_t sz, const char* file, int line) {
     // Your code here.
     if (default_buffer.pos + sz > default_buffer.size) {
         // Not enough space left in default buffer for allocation
+        myStats.nfail++;
+        myStats.fail_size += sz;
         return nullptr;
     }
 
     // Otherwise there is enough space; claim the next `sz` bytes
+
+
+
     void* ptr = &default_buffer.buffer[default_buffer.pos];
-    default_buffer.pos += sz;
+    allocation_pool[ptr] = sz;
+    default_buffer.pos += alignof(std::max_align_t);
+
+        
+    myStats.nactive++;
+    myStats.active_size += sz;
+    myStats.ntotal++;
+    myStats.total_size += sz;
+    if ((uintptr_t) ptr + sz > myStats.heap_max) {
+        myStats.heap_max = (uintptr_t) ptr + sz;
+
+    }
+    
     return ptr;
 }
 
@@ -68,6 +87,22 @@ void m61_free(void* ptr, const char* file, int line) {
     // avoid uninitialized variable warnings
     (void) ptr, (void) file, (void) line;
     // Your code here. The handout code does nothing!
+    if (ptr == nullptr) {
+
+        return ;
+    }
+
+    myStats.nactive--;
+    myStats.active_size -= allocation_pool[ptr];
+    if ((uintptr_t) ptr + allocation_pool[ptr] >= myStats.heap_max) {
+        myStats.heap_max = (uintptr_t) ptr - 1;
+    }
+    if ((uintptr_t) ptr <= myStats.heap_min) {
+        myStats.heap_min = (uintptr_t) ptr + alignof(std::max_align_t);
+    }
+    // myStats.ntotal++;
+    // myStats.total_size += sz;
+
 }
 
 
@@ -94,9 +129,9 @@ void* m61_calloc(size_t count, size_t sz, const char* file, int line) {
 m61_statistics m61_get_statistics() {
     // Your code here.
     // The handout code sets all statistics to enormous numbers.
-    m61_statistics stats;
-    memset(&stats, 255, sizeof(m61_statistics));
-    return stats;
+    // m61_statistics stats;
+    // memset(&stats, 255, sizeof(m61_statistics));
+    return myStats;
 }
 
 

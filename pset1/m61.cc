@@ -7,6 +7,7 @@
 #include <cassert>
 #include <sys/mman.h>
 #include <map>
+#include <list>
 
 
 struct m61_memory_buffer {
@@ -18,10 +19,27 @@ struct m61_memory_buffer {
     ~m61_memory_buffer();
 };
 
+
+struct allocated_block {
+
+    size_t size = 0;
+    size_t pos = 0;
+
+};
+
+struct free_block {
+    size_t size = 0;
+    size_t pos = 0;
+
+};
+
 static m61_memory_buffer default_buffer;
 
 static m61_statistics myStats = {0,0,0,0,0,0,0,0};
-static std::map<void*, size_t> allocation_pool;
+static std::map<void*, allocated_block> allocated_pool;
+
+static std::list<free_block> free_pool(1, {8 << 20, 0} );
+
 
 
 m61_memory_buffer::m61_memory_buffer() {
@@ -32,10 +50,62 @@ m61_memory_buffer::m61_memory_buffer() {
                                  // We want memory freshly allocated by the OS
     assert(buf != MAP_FAILED);
     this->buffer = (char*) buf;
+
 }
 
 m61_memory_buffer::~m61_memory_buffer() {
     munmap(this->buffer, this->size);
+}
+
+
+/// first_fit(sz, file, line)
+size_t first_fit(size_t sz) {
+    // tranverse free pool
+    auto it = free_pool.begin();
+    size_t block_size = std::max(sz, alignof(std::max_align_t));
+    while(it != free_pool.end()) {
+        if(block_size <= (*it).size) {
+            break;
+        }
+        it++;
+
+    }
+    if(it == free_pool.end()) {
+        return -1;
+    }
+    // update free_pool
+    if(block_size == (*it).size) {
+        free_pool.erase(it);
+    } else {
+        (*it).pos += block_size;
+        (*it).size -= block_size;
+    }
+    return (*it).pos;
+
+}
+
+// update 
+void update_allocated_pool(void* ptr, size_t sz) {
+    allocated_pool[ptr] = {sz, 0};
+
+}
+
+// update free_pool
+void update_free_pool(void* ptr) {
+    size_t pos = allocated_pool[ptr].pos;
+    size_t sz = allocated_pool[ptr].size;
+    allocated_pool.erase(ptr);
+    auto it = free_pool.begin();
+
+    while(it != free_pool.end()) {
+        if(pos <= (*it).pos) {
+            break;
+        }
+        it++;
+
+    }
+    (*it).pos = pos;
+    (*it).size += sz;
 }
 
 
@@ -56,17 +126,18 @@ void* m61_malloc(size_t sz, const char* file, int line) {
     }
 
     // Otherwise there is enough space; claim the next `sz` bytes
-    void* ptr = &default_buffer.buffer[default_buffer.pos];
-    allocation_pool[ptr] = sz;
-    if(sz < alignof(std::max_align_t)) {
-        default_buffer.pos += alignof(std::max_align_t);
-
-    } else {
-        default_buffer.pos += sz;
+    // find ava pos
+    size_t available_pos = first_fit(sz);
+    if (available_pos == -1) {
+        myStats.nfail++;
+        myStats.fail_size += sz;
+        return nullptr;
     }
 
+    void* ptr = &default_buffer.buffer[available_pos];
 
-        
+    update_allocated_pool(ptr, sz);
+ 
     myStats.nactive++;
     myStats.active_size += sz;
     myStats.ntotal++;
@@ -98,7 +169,9 @@ void m61_free(void* ptr, const char* file, int line) {
         return ;
     }
 
-    size_t sz = allocation_pool[ptr];
+    update_free_pool(ptr);
+
+    size_t sz = allocated_pool[ptr].size;
 
     myStats.nactive--;
     myStats.active_size -= sz;

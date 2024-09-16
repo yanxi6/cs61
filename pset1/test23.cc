@@ -5,7 +5,6 @@
 #include <random>
 // Check for memory reuse: up to 100 variable-sized active allocations.
 
-#pragma GCC optimize (0)
 int main() {
     std::default_random_engine randomness(std::random_device{}());
 
@@ -15,7 +14,6 @@ int main() {
     size_t n = 0;
 
     // 5000 times, allocate or free
-
     for (int i = 0; i != 10000; ++i) {
         if (uniform_int(size_t(0), nmax * nmax - 1, randomness) < n * n) {
             assert(n > 0);

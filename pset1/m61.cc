@@ -96,10 +96,10 @@ void update_allocated_pool(void* ptr, size_t pos, size_t sz) {
 }
 
 // update free_pool
+// todo: have not updated allocated pool
 void update_free_pool(void* ptr) {
     size_t pos = allocated_pool[ptr].pos;
     size_t sz = allocated_pool[ptr].size;
-    allocated_pool.erase(ptr);
     auto it = free_pool.begin();
 
     while(it != free_pool.end()) {

@@ -22,14 +22,14 @@ struct m61_memory_buffer {
 
 struct allocated_block {
 
-    size_t size = 0;
     size_t pos = 0;
+    size_t size = 0;
 
 };
 
 struct free_block {
-    size_t size = 0;
     size_t pos = 0;
+    size_t size = 0;
 
 };
 
@@ -38,7 +38,7 @@ static m61_memory_buffer default_buffer;
 static m61_statistics myStats = {0,0,0,0,0,0,0,0};
 static std::map<void*, allocated_block> allocated_pool;
 
-static std::list<free_block> free_pool(1, {8 << 20, 0} );
+static std::list<free_block> free_pool(1, {0, 8 << 20} );
 
 
 
@@ -63,6 +63,7 @@ size_t first_fit(size_t sz) {
     // tranverse free pool
     auto it = free_pool.begin();
     size_t block_size = std::max(sz, alignof(std::max_align_t));
+    size_t ava_pos = -1;
     while(it != free_pool.end()) {
         if(block_size <= (*it).size) {
             break;
@@ -71,22 +72,26 @@ size_t first_fit(size_t sz) {
 
     }
     if(it == free_pool.end()) {
-        return -1;
+        return ava_pos;
     }
+
+    ava_pos = (*it).pos;
     // update free_pool
+
     if(block_size == (*it).size) {
         free_pool.erase(it);
     } else {
+
         (*it).pos += block_size;
         (*it).size -= block_size;
     }
-    return (*it).pos;
+    return ava_pos;
 
 }
 
 // update 
-void update_allocated_pool(void* ptr, size_t sz) {
-    allocated_pool[ptr] = {sz, 0};
+void update_allocated_pool(void* ptr, size_t pos, size_t sz) {
+    allocated_pool[ptr] = {pos, sz};
 
 }
 
@@ -104,8 +109,23 @@ void update_free_pool(void* ptr) {
         it++;
 
     }
-    (*it).pos = pos;
-    (*it).size += sz;
+    
+    if( it != free_pool.begin()) {
+        auto prev = std::prev(it);
+        if( (*prev).pos +  (*prev).size >= pos) {
+            (*prev).size += sz;
+        } else {
+            free_pool.insert(it, {pos, sz});
+        }
+    } else {
+        free_pool.insert(it, {pos, sz});
+    }
+    auto prev = std::prev(it);
+    if((*prev).pos + (*prev).size >= (*it).pos) {
+        (*it).pos = (*prev).pos;
+        (*it).size += (*prev).size;
+        free_pool.erase(prev);
+    }
 }
 
 
@@ -136,7 +156,7 @@ void* m61_malloc(size_t sz, const char* file, int line) {
 
     void* ptr = &default_buffer.buffer[available_pos];
 
-    update_allocated_pool(ptr, sz);
+    update_allocated_pool(ptr, available_pos, sz);
  
     myStats.nactive++;
     myStats.active_size += sz;

@@ -189,9 +189,16 @@ void m61_free(void* ptr, const char* file, int line) {
         return ;
     }
 
-    update_free_pool(ptr);
+    if(allocated_pool.find(ptr) == allocated_pool.end()) {
+        fprintf(stderr, "MEMORY BUG: %s:%d: invalid free of pointer %x, not in heap\n", file, line, ptr);
+        return ;
 
+    }
+    
     size_t sz = allocated_pool[ptr].size;
+
+
+    update_free_pool(ptr);
 
     myStats.nactive--;
     myStats.active_size -= sz;

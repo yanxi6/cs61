@@ -126,6 +126,7 @@ void update_free_pool(void* ptr) {
         (*it).size += (*prev).size;
         free_pool.erase(prev);
     }
+    allocated_pool[ptr] = {0, 0};
 }
 
 
@@ -189,8 +190,21 @@ void m61_free(void* ptr, const char* file, int line) {
         return ;
     }
 
+
+    if(ptr < &default_buffer.buffer[0] || &default_buffer.buffer[default_buffer.size - 1] < ptr) {
+        fprintf(stderr, "MEMORY BUG: %s:%d: invalid free of pointer %p, not in heap\n", file, line, ptr);
+        return ;
+
+    }
+
     if(allocated_pool.find(ptr) == allocated_pool.end()) {
-        fprintf(stderr, "MEMORY BUG: %s:%d: invalid free of pointer %x, not in heap\n", file, line, ptr);
+        fprintf(stderr, "MEMORY BUG: %s:%d: invalid free of pointer %p, not allocated\n", file, line, ptr);
+        return ;
+
+    }
+
+    if(allocated_pool[ptr].size == 0) {
+        fprintf(stderr, "MEMORY BUG: %s:%d: invalid free of pointer %p, double free\n", file, line, ptr);
         return ;
 
     }

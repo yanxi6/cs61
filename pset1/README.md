@@ -7,9 +7,10 @@ collaborators and citations, in `AUTHORS.md`.
 
 Grading notes (if any)
 ----------------------
-9.15:
-9.16:
 
+Phase 1: Statistics (test01–test20)
+Phase 2: Memory reuse (test21–test32)
+Phase 3: Debugging support (test33–test53)
 
 Extra credit attempted (if any)
 -------------------------------

@@ -24,6 +24,8 @@ struct allocated_block {
 
     size_t pos = 0;
     size_t size = 0;
+    size_t actual_size = 0;
+    size_t padding[4];
 
 };
 
@@ -62,7 +64,7 @@ m61_memory_buffer::~m61_memory_buffer() {
 size_t first_fit(size_t sz) {
     // tranverse free pool
     auto it = free_pool.begin();
-    size_t block_size = std::max(sz, alignof(std::max_align_t));
+    size_t block_size = std::max(sz + 4, alignof(std::max_align_t));
     size_t ava_pos = -1;
     while(it != free_pool.end()) {
         if(block_size <= (*it).size) {
@@ -90,8 +92,17 @@ size_t first_fit(size_t sz) {
 }
 
 // update 
-void update_allocated_pool(void* ptr, size_t pos, size_t sz) {
-    allocated_pool[ptr] = {pos, sz};
+void update_allocated_pool(void* ptr, size_t pos, size_t sz, size_t actual_size) {
+
+    allocated_block cur;
+    cur.padding[0] =  default_buffer.buffer[pos + sz - 4];
+    cur.padding[1] =  default_buffer.buffer[pos + sz - 3];
+    cur.padding[2] =  default_buffer.buffer[pos + sz - 2];
+    cur.padding[3] =  default_buffer.buffer[pos + sz - 1];
+    cur.pos = pos;
+    cur.size = sz;
+    cur.actual_size = actual_size;
+    allocated_pool[ptr] = cur;
 
 }
 
@@ -126,7 +137,7 @@ void update_free_pool(void* ptr) {
         (*it).size += (*prev).size;
         free_pool.erase(prev);
     }
-    allocated_pool[ptr] = {0, 0};
+    allocated_pool[ptr].size = 0;
 }
 
 
@@ -157,7 +168,8 @@ void* m61_malloc(size_t sz, const char* file, int line) {
 
     void* ptr = &default_buffer.buffer[available_pos];
 
-    update_allocated_pool(ptr, available_pos, sz);
+
+    update_allocated_pool(ptr, available_pos, std::max(sz + 4, alignof(std::max_align_t)), sz);
  
     myStats.nactive++;
     myStats.active_size += sz;
@@ -186,36 +198,42 @@ void m61_free(void* ptr, const char* file, int line) {
 
     // Your code here. The handout code does nothing!
     if (ptr == nullptr) {
-
         return ;
     }
 
 
     if(ptr < &default_buffer.buffer[0] || &default_buffer.buffer[default_buffer.size - 1] < ptr) {
         fprintf(stderr, "MEMORY BUG: %s:%d: invalid free of pointer %p, not in heap\n", file, line, ptr);
-        return ;
+        abort();
 
     }
 
     if(allocated_pool.find(ptr) == allocated_pool.end()) {
         fprintf(stderr, "MEMORY BUG: %s:%d: invalid free of pointer %p, not allocated\n", file, line, ptr);
-        return ;
-
+        abort();
     }
 
     if(allocated_pool[ptr].size == 0) {
         fprintf(stderr, "MEMORY BUG: %s:%d: invalid free of pointer %p, double free\n", file, line, ptr);
-        return ;
-
+        abort();
     }
-    
+
     size_t sz = allocated_pool[ptr].size;
+    size_t pos = allocated_pool[ptr].pos;
+    // size_t szCur = std::max(sz + 4, alignof(std::max_align_t));
+    allocated_block cur = allocated_pool[ptr];
+    for(size_t i = 0; i < 4; i++) {
+        if(cur.padding[i] != default_buffer.buffer[pos + sz - (4 - i)]) {
+            fprintf(stderr, "MEMORY BUG: %s:%d: detected wild write during free of pointer %p\n", file, line, ptr);
+            abort();
+        }
+    }
 
 
     update_free_pool(ptr);
 
     myStats.nactive--;
-    myStats.active_size -= sz;
+    myStats.active_size -= allocated_pool[ptr].actual_size;
     if (!myStats.heap_min || myStats.heap_min > (uintptr_t) ptr) {
         myStats.heap_min = (uintptr_t) ptr;
     }

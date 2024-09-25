@@ -95,10 +95,10 @@ size_t first_fit(size_t sz) {
 void update_allocated_pool(void* ptr, size_t pos, size_t sz, size_t actual_size) {
 
     allocated_block cur;
-    cur.padding[0] =  default_buffer.buffer[pos + sz - 4];
-    cur.padding[1] =  default_buffer.buffer[pos + sz - 3];
-    cur.padding[2] =  default_buffer.buffer[pos + sz - 2];
-    cur.padding[3] =  default_buffer.buffer[pos + sz - 1];
+    default_buffer.buffer[pos + sz - 4] = '^';
+    default_buffer.buffer[pos + sz - 3] = '^';
+    default_buffer.buffer[pos + sz - 2] = '^';
+    default_buffer.buffer[pos + sz - 1] = '^';
     cur.pos = pos;
     cur.size = sz;
     cur.actual_size = actual_size;
@@ -223,8 +223,10 @@ void m61_free(void* ptr, const char* file, int line) {
     // size_t szCur = std::max(sz + 4, alignof(std::max_align_t));
     allocated_block cur = allocated_pool[ptr];
     for(size_t i = 0; i < 4; i++) {
-        if(cur.padding[i] != default_buffer.buffer[pos + sz - (4 - i)]) {
+        
+        if('^' != default_buffer.buffer[pos + sz - (4 - i)]) {
             fprintf(stderr, "MEMORY BUG: %s:%d: detected wild write during free of pointer %p\n", file, line, ptr);
+            
             abort();
         }
     }

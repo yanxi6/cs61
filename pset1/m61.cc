@@ -214,6 +214,14 @@ void m61_free(void* ptr, const char* file, int line) {
 
     if(allocated_pool.find(ptr) == allocated_pool.end()) {
         fprintf(stderr, "MEMORY BUG: %s:%d: invalid free of pointer %p, not allocated\n", file, line, ptr);
+        for (auto &[k, v] : allocated_pool) {
+            if(v.size != 0) {
+                size_t gap = (uintptr_t) ptr - (uintptr_t) k;
+                if(gap < v.size) {
+                    fprintf(stderr, "  %s:%ld: %p is %d bytes inside a %d byte region allocated here\n", v.file, v.line, k, gap, v.actual_size);
+                } 
+            }
+        }
         abort();
     }
 

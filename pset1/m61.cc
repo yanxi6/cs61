@@ -25,7 +25,8 @@ struct allocated_block {
     size_t pos = 0;
     size_t size = 0;
     size_t actual_size = 0;
-    size_t padding[5];
+    const char* file;
+    size_t line;
 
 };
 
@@ -92,7 +93,7 @@ size_t first_fit(size_t sz) {
 }
 
 // update 
-void update_allocated_pool(void* ptr, size_t pos, size_t sz, size_t actual_size) {
+void update_allocated_pool(void* ptr, size_t pos, size_t sz, size_t actual_size, const char* file, size_t line) {
 
     allocated_block cur;
     default_buffer.buffer[pos + sz - 5] = '^';
@@ -103,6 +104,8 @@ void update_allocated_pool(void* ptr, size_t pos, size_t sz, size_t actual_size)
     cur.pos = pos;
     cur.size = sz;
     cur.actual_size = actual_size;
+    cur.file = file;
+    cur.line = line;
     allocated_pool[ptr] = cur;
 
 }
@@ -170,7 +173,7 @@ void* m61_malloc(size_t sz, const char* file, int line) {
     void* ptr = &default_buffer.buffer[available_pos];
 
 
-    update_allocated_pool(ptr, available_pos, std::max(sz + 5, alignof(std::max_align_t)), sz);
+    update_allocated_pool(ptr, available_pos, std::max(sz + 5, alignof(std::max_align_t)), sz, file, line);
  
     myStats.nactive++;
     myStats.active_size += sz;
@@ -302,4 +305,9 @@ void m61_print_statistics() {
 
 void m61_print_leak_report() {
     // Your code here.
+    for (auto &[k, v] : allocated_pool) {
+        if(v.size != 0) {
+            printf("LEAK CHECK: %s:%d: allocated object %p with size %d\n", v.file, v.line, k, v.actual_size);
+        }
+    }
 }

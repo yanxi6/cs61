@@ -25,7 +25,7 @@ struct allocated_block {
     size_t pos = 0;
     size_t size = 0;
     size_t actual_size = 0;
-    size_t padding[4];
+    size_t padding[5];
 
 };
 
@@ -64,7 +64,7 @@ m61_memory_buffer::~m61_memory_buffer() {
 size_t first_fit(size_t sz) {
     // tranverse free pool
     auto it = free_pool.begin();
-    size_t block_size = std::max(sz + 4, alignof(std::max_align_t));
+    size_t block_size = std::max(sz + 5, alignof(std::max_align_t));
     size_t ava_pos = -1;
     while(it != free_pool.end()) {
         if(block_size <= (*it).size) {
@@ -95,6 +95,7 @@ size_t first_fit(size_t sz) {
 void update_allocated_pool(void* ptr, size_t pos, size_t sz, size_t actual_size) {
 
     allocated_block cur;
+    default_buffer.buffer[pos + sz - 5] = '^';
     default_buffer.buffer[pos + sz - 4] = '^';
     default_buffer.buffer[pos + sz - 3] = '^';
     default_buffer.buffer[pos + sz - 2] = '^';
@@ -169,7 +170,7 @@ void* m61_malloc(size_t sz, const char* file, int line) {
     void* ptr = &default_buffer.buffer[available_pos];
 
 
-    update_allocated_pool(ptr, available_pos, std::max(sz + 4, alignof(std::max_align_t)), sz);
+    update_allocated_pool(ptr, available_pos, std::max(sz + 5, alignof(std::max_align_t)), sz);
  
     myStats.nactive++;
     myStats.active_size += sz;
@@ -220,11 +221,11 @@ void m61_free(void* ptr, const char* file, int line) {
 
     size_t sz = allocated_pool[ptr].size;
     size_t pos = allocated_pool[ptr].pos;
-    // size_t szCur = std::max(sz + 4, alignof(std::max_align_t));
+
     allocated_block cur = allocated_pool[ptr];
-    for(size_t i = 0; i < 4; i++) {
+    for(size_t i = 0; i < 5; i++) {
         
-        if('^' != default_buffer.buffer[pos + sz - (4 - i)]) {
+        if('^' != default_buffer.buffer[pos + sz - (5 - i)]) {
             fprintf(stderr, "MEMORY BUG: %s:%d: detected wild write during free of pointer %p\n", file, line, ptr);
             
             abort();

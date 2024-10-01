@@ -72,20 +72,22 @@ int io61_readc(io61_file* f) {
 //    This is called a “short read.”
 
 ssize_t io61_read(io61_file* f, unsigned char* buf, size_t sz) {
-    size_t nread = 0;
-    while (nread != sz) {
-        int ch = io61_readc(f);
-        if (ch == EOF) {
-            break;
+    size_t nleft = sz;
+    ssize_t nread = 0;
+    unsigned char * bufp = buf;
+    while (nleft > 0) {
+        if ((nread = read(f->fd, bufp, nleft)) < 0) {
+            if (errno == EINTR)
+                nread = 0;
+            else
+                return -1;
         }
-        buf[nread] = ch;
-        ++nread;
+        else if (nread == 0)
+            break;
+        nleft -= nread;
+        bufp += nread;
     }
-    if (nread != 0 || sz == 0 || errno == 0) {
-        return nread;
-    } else {
-        return -1;
-    }
+    return (sz - nleft);
 }
 
 
@@ -112,18 +114,22 @@ int io61_writec(io61_file* f, int c) {
 //    before the error occurred.
 
 ssize_t io61_write(io61_file* f, const unsigned char* buf, size_t sz) {
-    size_t nwritten = 0;
-    while (nwritten != sz) {
-        if (io61_writec(f, buf[nwritten]) == -1) {
-            break;
+    size_t nleft = sz;
+    ssize_t nwritten = 0;
+    const unsigned char * bufp = buf;
+    while (nleft > 0) {
+        if ((nwritten = write(f->fd, bufp, nleft)) <= 0) {
+            if (errno == EINTR)
+                nwritten = 0;
+            else
+                return -1;
         }
-        ++nwritten;
+        else if (nwritten == 0)
+            break;
+        nleft -= nwritten;
+        bufp += nwritten;
     }
-    if (nwritten != 0 || sz == 0) {
-        return nwritten;
-    } else {
-        return -1;
-    }
+    return sz;
 }
 
 

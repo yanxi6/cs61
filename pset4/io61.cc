@@ -16,6 +16,53 @@ struct io61_file {
     int mode;        // open mode (O_RDONLY or O_WRONLY)
 };
 
+struct io61_fcache {
+    int fd;
+
+    // `bufsiz` is the cache block size
+    static constexpr off_t bufsize = 4096;
+    // Cached data is stored in `cbuf`
+    unsigned char cbuf[bufsize];
+
+    // The following “tags” are addresses—file offsets—that describe the cache’s contents.
+    // `tag`: File offset of first byte of cached data (0 when file is opened).
+    off_t tag = 0;
+    // `end_tag`: File offset one past the last byte of cached data (0 when file is opened).
+    off_t end_tag = 0;
+    // `pos_tag`: Cache position: file offset of the cache.
+    // In read caches, this is the file offset of the next character to be read.
+    off_t pos_tag = 0;
+};
+
+io61_fcache fc;
+
+bool io61_fill(io61_fcache* f) {
+    // Empty the cache entry, then fill it with new data.
+    // The new data is taken from the file starting at file offset `end_tag`
+    // (which equals the file position).
+    // The cache position equals the first character read.
+    // Only called for read caches.
+
+    // Check invariants.
+    assert(f->tag <= f->pos_tag && f->pos_tag <= f->end_tag);
+    assert(f->end_tag - f->pos_tag <= f->bufsize);
+
+    // Reset the cache to empty.
+    f->tag = f->pos_tag = f->end_tag;
+    ssize_t n = read(f->fd, f->cbuf, f->bufsize);
+    if (n >= 0) {
+        f->end_tag = f->tag + n;
+    }
+
+    // Recheck invariants (good practice!).
+    assert(f->tag <= f->pos_tag && f->pos_tag <= f->end_tag);
+    assert(f->end_tag - f->pos_tag <= f->bufsize);
+
+    if (n <= 0)
+        return true;
+    return false;
+}
+
 
 // io61_fdopen(fd, mode)
 //    Returns a new io61_file for file descriptor `fd`. `mode` is either
@@ -48,16 +95,22 @@ int io61_close(io61_file* f) {
 
 int io61_readc(io61_file* f) {
     unsigned char ch;
-    ssize_t nr = read(f->fd, &ch, 1);
-    if (nr == 1) {
-        return ch;
-    } else if (nr == 0) {
-        errno = 0; // clear `errno` to indicate EOF
-        return -1;
-    } else {
-        assert(nr == -1 && errno > 0);
+    bool end = false;
+
+    if (fc.end_tag == 0) {
+        fc.fd = f->fd;
+
+    }
+    if (fc.pos_tag == fc.end_tag) {
+        end = io61_fill(&fc);
+    }
+    if (end) {
         return -1;
     }
+    ch = fc.cbuf[fc.pos_tag - fc.tag];
+    ++fc.pos_tag;
+    return ch;
+
 }
 
 
@@ -208,3 +261,5 @@ off_t io61_filesize(io61_file* f) {
         return -1;
     }
 }
+
+

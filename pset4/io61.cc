@@ -34,7 +34,8 @@ struct io61_fcache {
     off_t pos_tag = 0;
 };
 
-io61_fcache fc;
+io61_fcache fc_read;
+io61_fcache fc_write;
 
 bool io61_fill(io61_fcache* f) {
     // Empty the cache entry, then fill it with new data.
@@ -97,18 +98,18 @@ int io61_readc(io61_file* f) {
     unsigned char ch;
     bool end = false;
 
-    if (fc.end_tag == 0) {
-        fc.fd = f->fd;
+    if (fc_read.end_tag == 0) {
+        fc_read.fd = f->fd;
 
     }
-    if (fc.pos_tag == fc.end_tag) {
-        end = io61_fill(&fc);
+    if (fc_read.pos_tag == fc_read.end_tag) {
+        end = io61_fill(&fc_read);
     }
     if (end) {
         return -1;
     }
-    ch = fc.cbuf[fc.pos_tag - fc.tag];
-    ++fc.pos_tag;
+    ch = fc_read.cbuf[fc_read.pos_tag - fc_read.tag];
+    ++fc_read.pos_tag;
     return ch;
 
 }
@@ -151,12 +152,19 @@ ssize_t io61_read(io61_file* f, unsigned char* buf, size_t sz) {
 
 int io61_writec(io61_file* f, int c) {
     unsigned char ch = c;
-    ssize_t nw = write(f->fd, &ch, 1);
-    if (nw == 1) {
-        return 0;
-    } else {
-        return -1;
+    int end = 0;
+    if (fc_write.end_tag == 0) {
+        fc_write.fd = f->fd;
+
     }
+    if (fc_write.end_tag == fc_write.pos_tag) {
+        end = io61_flush(f);
+    }
+    if (end == -1) 
+        return -1;
+    fc_write.cbuf[fc_write.pos_tag - fc_write.tag] = ch;
+    ++fc_write.pos_tag;
+    return 0;
 }
 
 
@@ -197,6 +205,13 @@ ssize_t io61_write(io61_file* f, const unsigned char* buf, size_t sz) {
 
 int io61_flush(io61_file* f) {
     (void) f;
+    ssize_t nwrite = write(f->fd, fc_write.cbuf, fc_write.pos_tag - fc_write.tag);
+    if (nwrite < 0) {
+        return -1;
+    }
+    fc_write.end_tag += fc_write.bufsize;
+    fc_write.tag = fc_write.pos_tag;
+
     return 0;
 }
 

@@ -50,7 +50,7 @@ bool io61_fill(io61_fcache* f) {
     // Reset the cache to empty.
     f->tag = f->pos_tag = f->end_tag;
     ssize_t n = read(f->fd, f->cbuf, f->bufsize);
-    if (n >= 0) {
+    if (n > 0) {
         f->end_tag = f->tag + n;
     }
 
@@ -141,6 +141,7 @@ ssize_t io61_read(io61_file* f, unsigned char* buf, size_t sz) {
         bufp += nread;
     }
     return (sz - nleft);
+
 }
 
 

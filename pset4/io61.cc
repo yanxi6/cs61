@@ -51,10 +51,11 @@ int io61_fill(io61_fcache* f) {
     // Reset the cache to empty.
     f->tag = f->pos_tag = f->end_tag;
     ssize_t n = read(f->fd, f->cbuf, f->bufsize);
-    if (n >= 0) {
-        f->end_tag = f->tag + n;
+    if (n < 0) {
+        return -1;
     }
 
+    f->end_tag = f->tag + n;
     // Recheck invariants (good practice!).
     assert(f->tag <= f->pos_tag && f->pos_tag <= f->end_tag);
     assert(f->end_tag - f->pos_tag <= f->bufsize);
@@ -207,7 +208,7 @@ int io61_flush(io61_file* f) {
     ssize_t nwrite = write(f->fd, fc_write.cbuf, fc_write.pos_tag - fc_write.tag);
     if (nwrite >= 0) {
         fc_write.tag = fc_write.pos_tag = fc_write.end_tag;
-        fc_write.end_tag += 199;
+        fc_write.end_tag += 2034;
         return 0;
     }
 
@@ -220,13 +221,40 @@ int io61_flush(io61_file* f) {
 //    Returns 0 on success and -1 on failure.
 
 int io61_seek(io61_file* f, off_t off) {
-    off_t r = lseek(f->fd, (off_t) off, SEEK_SET);
-    // Ignore the returned offset unless it’s an error.
-    if (r == -1) {
-        return -1;
-    } else {
-        return 0;
+    if (f->mode == O_WRONLY) {
+        io61_flush(f);
+        off_t n_tag = lseek(f->fd, off, SEEK_SET);
+        if (n_tag != -1) {
+            fc_write.end_tag = fc_write.tag + 4096;
+            fc_write.pos_tag = fc_write.tag = n_tag;
+            return 0;
+        }
+    } else if (f->mode == O_RDONLY){
+
+        off_t r = lseek(f->fd, (off_t) off, SEEK_SET);
+        // Ignore the returned offset unless it’s an error.
+        if (r == -1) {
+            return -1;
+        } else {
+            return 0;
+        }
+        // int offset = off % 4096;
+        // if (off >= fc_read.tag && off < fc_read.end_tag) {
+        //     fc_read.pos_tag = off;
+        //     return 0;
+
+        // }
+        // off_t r = lseek(f->fd, off - offset, SEEK_SET);
+        // if (r != -1) {
+        //     fc_read.end_tag = r;
+        //     io61_fill(&fc_read);
+        //     fc_read.pos_tag += offset;
+        //     return 0;
+        // }
+
     }
+    return -1;
+    
 }
 
 

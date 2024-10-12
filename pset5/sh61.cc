@@ -68,8 +68,23 @@ void command::run() {
     assert(this->pid == -1);
     assert(this->args.size() > 0);
     // Your code here!
+    const char* args[] = {
+        "echo", // argv[0] is the string used to execute the program
+        "Hooray",
+        nullptr
+    };
+    pid_t p = fork();
+    if (p == 0) {
+        // fprintf(stderr, "About to exec myecho from pid %d\n", getpid());
+        int r = execvp("echo", (char**) args);
+        fprintf(stderr, "Finished execing myecho from pid %d; status %d\n",
+            getpid(), r);
 
-    fprintf(stderr, "command::run not done yet\n");
+
+    } else {
+        // fprintf(stderr, "Child pid %d should exec myecho\n", p);
+    }
+    
 }
 
 
@@ -99,7 +114,7 @@ void command::run() {
 
 void run_list(command* c) {
     c->run();
-    fprintf(stderr, "command::run not done yet\n");
+
 }
 
 

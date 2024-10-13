@@ -68,24 +68,37 @@ void command::run() {
     assert(this->pid == -1);
     assert(this->args.size() > 0);
     // Your code here!
-    const char* args[this->args.size() + 1];
-    for (int i = 0; i < this->args.size(); i++) {
-        args[i] = this->args[i].c_str();
+    int k = 0, m = 0;
+    const char* input_args[100][3];
+    for (size_t i = 0; i < this->args.size(); i++) {
+        
+        if (this->args[i].compare(";") == 0) {
+            // printf("%d: %s\n", i, input_args[k][m]);
+            input_args[k++][m] = nullptr;  
+            m = 0;
+        } else {
+            input_args[k][m++] = this->args[i].c_str();
+        }
     }
+    input_args[k++][m] = nullptr; 
     //Note that the last element of the vector must be a `nullptr`
-    args[this->args.size()] = nullptr;  
-    pid_t p = fork();
-    if (p == 0) {
-        // fprintf(stderr, "About to exec myecho from pid %d\n", getpid());
-        int r = execvp(args[0], (char**) args);
-        fprintf(stderr, "Finished execing myecho from pid %d; status %d\n",
-            getpid(), r);
-    } else {
-        // fprintf(stderr, "Child pid %d should exec myecho\n", p);
+    for (int i = 0; i < k; i++) {
+        pid_t p = fork();
+        if (p == 0) {
+            
+            int r = execvp(input_args[i][0], (char**) input_args[i]);
+            // fprintf(stderr, "Finished execing myecho from pid %d; status %d\n",
+            //     getpid(), r);
+            
+        } else {
+            // fprintf(stderr, "Child pid %d should exec myecho\n", p);
+        }
+        int status;
+        pid_t exited_pid = waitpid(p, &status, 0);
+        // assert(exited_pid == p);
+
     }
-    int status;
-    pid_t exited_pid = waitpid(p, &status, 0);
-    assert(exited_pid == p);
+
 }
 
 

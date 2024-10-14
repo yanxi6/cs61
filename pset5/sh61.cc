@@ -4,6 +4,7 @@
 #include <vector>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <string.h>
 
 // For the love of God
 #undef exit
@@ -69,34 +70,61 @@ void command::run() {
     assert(this->args.size() > 0);
     // Your code here!
     int k = 0, m = 0;
+    int status;
+    bool sts = true;
     const char* input_args[100][3];
     for (size_t i = 0; i < this->args.size(); i++) {
-        
-        if (this->args[i].compare(";") == 0) {
+        if (   this->args[i].compare(";") == 0
+            || this->args[i].compare("&&") == 0
+            || this->args[i].compare("||") == 0) {
             // printf("%d: %s\n", i, input_args[k][m]);
             input_args[k++][m] = nullptr;  
             m = 0;
-        } else {
-            input_args[k][m++] = this->args[i].c_str();
         }
+        input_args[k][m++] = this->args[i].c_str();
     }
     input_args[k++][m] = nullptr; 
     //Note that the last element of the vector must be a `nullptr`
     for (int i = 0; i < k; i++) {
         pid_t p = fork();
         if (p == 0) {
-            
-            int r = execvp(input_args[i][0], (char**) input_args[i]);
-            // fprintf(stderr, "Finished execing myecho from pid %d; status %d\n",
-            //     getpid(), r);
-            
-        } else {
-            // fprintf(stderr, "Child pid %d should exec myecho\n", p);
-        }
-        int status;
-        pid_t exited_pid = waitpid(p, &status, 0);
-        // assert(exited_pid == p);
+            if (strcmp(input_args[i][0], "&&") == 0) {
+                // int r = execvp(input_args[i][0], (char**) input_args[i]);
 
+            } else if (strcmp(input_args[i][0], "||") == 0) {
+
+            } else if (strcmp(input_args[i][0], ";") == 0)  {
+
+                const char* args[] = {
+                    input_args[i][1], // argv[0] is the string used to execute the program
+                    input_args[i][2],
+                    nullptr
+                };
+                int j = 1;
+                // while (input_args[i][j] != nullptr) {
+                //     strcpy(args[j - 1], input_args[i][j]);
+                //    //  printf("%d: %s\n", j - 1, args[j - 1]);
+                //     j++;
+
+                // }
+                // args[j] = nullptr;
+                // for(int mm = 0; mm < 3; mm++) {
+                //     printf("%d: %s\n", mm, args[mm]);
+                // }
+                execvp(args[0], (char**) args);
+
+            } else {
+                int r = execvp(input_args[i][0], (char**) input_args[i]);
+     
+            }
+            
+           
+        } else {
+            // fprintf(stderr, "Child pid %d should exec sth.\n", p);
+        }
+
+        pid_t exited_pid = waitpid(p, &status, 0);
+        assert(exited_pid == p);
     }
 
 }

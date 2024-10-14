@@ -89,9 +89,27 @@ void command::run() {
         pid_t p = fork();
         if (p == 0) {
             if (strcmp(input_args[i][0], "&&") == 0) {
-                // int r = execvp(input_args[i][0], (char**) input_args[i]);
+                const char* args[] = {
+                    input_args[i][1], // argv[0] is the string used to execute the program
+                    input_args[i][2],
+                    nullptr
+                };
+                if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+                    int r = execvp(args[0], (char**) args);
+
+                }
+                
 
             } else if (strcmp(input_args[i][0], "||") == 0) {
+                const char* args[] = {
+                    input_args[i][1], // argv[0] is the string used to execute the program
+                    input_args[i][2],
+                    nullptr
+                };
+                if (WIFEXITED(status) == 0 || WEXITSTATUS(status) != 0) {
+                    int r = execvp(args[0], (char**) args);
+
+                }
 
             } else if (strcmp(input_args[i][0], ";") == 0)  {
 
@@ -117,14 +135,13 @@ void command::run() {
                 int r = execvp(input_args[i][0], (char**) input_args[i]);
      
             }
-            
-           
         } else {
             // fprintf(stderr, "Child pid %d should exec sth.\n", p);
         }
 
         pid_t exited_pid = waitpid(p, &status, 0);
-        assert(exited_pid == p);
+        // printf("WIFEXITED(status): %d, WEXITSTATUS(status): %d\n", WIFEXITED(status), WEXITSTATUS(status));
+        // assert(exited_pid == p);
     }
 
 }

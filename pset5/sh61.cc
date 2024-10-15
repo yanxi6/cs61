@@ -71,15 +71,15 @@ void command::run() {
     // Your code here!
     int k = 0, m = 0;
     int status;
-    bool sts = true;
-    const char* input_args[100][3];
+    const char* input_args[100][5];
     for (size_t i = 0; i < this->args.size(); i++) {
         if (   this->args[i].compare(";") == 0
             || this->args[i].compare("&&") == 0
             || this->args[i].compare("||") == 0) {
-            // printf("%d: %s\n", i, input_args[k][m]);
-            input_args[k++][m] = nullptr;  
-            m = 0;
+            if (this->args[i - 1].compare("echo") != 0) {
+                input_args[k++][m] = nullptr;  
+                m = 0;
+            }
         }
         input_args[k][m++] = this->args[i].c_str();
     }
@@ -92,27 +92,23 @@ void command::run() {
                 const char* args[] = {
                     input_args[i][1], // argv[0] is the string used to execute the program
                     input_args[i][2],
+                    input_args[i][3],
                     nullptr
                 };
                 if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
                     int r = execvp(args[0], (char**) args);
-
                 }
-                
-
             } else if (strcmp(input_args[i][0], "||") == 0) {
                 const char* args[] = {
                     input_args[i][1], // argv[0] is the string used to execute the program
                     input_args[i][2],
                     nullptr
                 };
-                if (WIFEXITED(status) == 0 || WEXITSTATUS(status) != 0) {
+                if (WIFEXITED(status) == 0 || WEXITSTATUS(status)) {
                     int r = execvp(args[0], (char**) args);
 
                 }
-
             } else if (strcmp(input_args[i][0], ";") == 0)  {
-
                 const char* args[] = {
                     input_args[i][1], // argv[0] is the string used to execute the program
                     input_args[i][2],
@@ -133,14 +129,13 @@ void command::run() {
 
             } else {
                 int r = execvp(input_args[i][0], (char**) input_args[i]);
-     
             }
         } else {
             // fprintf(stderr, "Child pid %d should exec sth.\n", p);
         }
 
         pid_t exited_pid = waitpid(p, &status, 0);
-        // printf("WIFEXITED(status): %d, WEXITSTATUS(status): %d\n", WIFEXITED(status), WEXITSTATUS(status));
+        // printf("WIFEXITED: %d, WEXITSTATUS: %d\n", WIFEXITED(status), WEXITSTATUS(status));
         // assert(exited_pid == p);
     }
 
@@ -265,6 +260,5 @@ int main(int argc, char* argv[]) {
         // Handle zombie processes and/or interrupt requests
         // Your code here!
     }
-
     return 0;
 }

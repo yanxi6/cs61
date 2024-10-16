@@ -38,8 +38,19 @@ command::command() {
 
 command::~command() {
 }
+
 int status = 0;
 
+void execute(const char** args) {
+    pid_t p = fork();
+    // fprintf(stderr, "1 pid: %d \n", getpid());
+    if (p == 0) {
+        int r = execvp(args[0], (char**) args);
+        // fprintf(stderr, "2 pid: %d \n", getpid());
+    }
+    pid_t exited_pid = waitpid(p, &status, 0);
+    assert(exited_pid == p);
+}
 
 // COMMAND EXECUTION
 
@@ -75,21 +86,26 @@ void command::run() {
     const char* input_args[100][5];
     for (size_t i = 0; i < this->args.size(); i++) {
         if (   this->args[i].compare(";") == 0
-            || this->args[i].compare("&&") == 0
+            || (this->args[i].compare("&&") == 0 && this->args[i].compare("\"&&\"") != 0)
             || this->args[i].compare("||") == 0) {
             if (this->args[i - 1].compare("echo") != 0) {
                 input_args[k++][m] = nullptr;  
                 m = 0;
             }
+            // input_args[k++][m] = nullptr;  
+            // m = 0;
         }
         input_args[k][m++] = this->args[i].c_str();
     }
     input_args[k++][m] = nullptr; 
-
-
+    // for (int i = 0; i < k; i++) {
+    //     for (int j = 0; j < 5; j++) {
+    //         fprintf(stderr, "%s ", input_args[i][j]);
+    //     }
+    //     fprintf(stderr, " | ");
+    // }
     //Note that the last element of the vector must be a `nullptr`
-    for (int i = 0; i < 0; i++) {
-
+    for (int i = 0; i < k; i++) {
         if (strcmp(input_args[i][0], "&&") == 0) {
             const char* args[] = {
                 input_args[i][1], // argv[0] is the string used to execute the program
@@ -98,11 +114,7 @@ void command::run() {
                 nullptr
             };
             if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
-                pid_t p = fork();
-                if (p == 0) {
-                    int r = execvp(input_args[i][0], (char**) input_args[i]);
-                }
-                pid_t exited_pid = waitpid(p, &status, 0);
+                execute(args);
             }
         } else if (strcmp(input_args[i][0], "||") == 0) {
             const char* args[] = {
@@ -111,11 +123,7 @@ void command::run() {
                 nullptr
             };
             if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-                pid_t p = fork();
-                if (p == 0) {
-                    int r = execvp(input_args[i][0], (char**) input_args[i]);
-                }
-                pid_t exited_pid = waitpid(p, &status, 0);
+                execute(args);
             }
         } else if (strcmp(input_args[i][0], ";") == 0)  {
             const char* args[] = {
@@ -123,24 +131,22 @@ void command::run() {
                 input_args[i][2],
                 nullptr
             };
-            pid_t p = fork();
-            if (p == 0) {
-                int r = execvp(input_args[i][0], (char**) input_args[i]);
-            }
-            pid_t exited_pid = waitpid(p, &status, 0);
+            execute(args);
         } else {
-            pid_t p = fork();
-            fprintf(stderr, "k: %d \n", k);
-            if (p == 0) {
-                int r = execvp(input_args[i][0], (char**) input_args[i]);
-
-            }
-            pid_t exited_pid = waitpid(p, &status, 0);
+            const char* args[] = {
+                input_args[i][0],
+                input_args[i][1],
+                input_args[i][2],
+                input_args[i][3],
+                nullptr
+            };
+            execute(args);
         }
         // printf("WIFEXITED: %d, WEXITSTATUS: %d\n", WIFEXITED(status), WEXITSTATUS(status));
         // assert(exited_pid == p);
     }
 }
+
 
 
 // run_list(c)

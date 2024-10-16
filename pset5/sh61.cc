@@ -70,7 +70,7 @@ void command::run() {
     assert(this->args.size() > 0);
     // Your code here!
     int k = 0, m = 0;
-    int status;
+
     const char* input_args[100][5];
     for (size_t i = 0; i < this->args.size(); i++) {
         if (   this->args[i].compare(";") == 0
@@ -84,61 +84,52 @@ void command::run() {
         input_args[k][m++] = this->args[i].c_str();
     }
     input_args[k++][m] = nullptr; 
+    int status;
+
     //Note that the last element of the vector must be a `nullptr`
     for (int i = 0; i < k; i++) {
-        pid_t p = fork();
-        if (p == 0) {
-            if (strcmp(input_args[i][0], "&&") == 0) {
-                const char* args[] = {
-                    input_args[i][1], // argv[0] is the string used to execute the program
-                    input_args[i][2],
-                    input_args[i][3],
-                    nullptr
-                };
-                if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
-                    int r = execvp(args[0], (char**) args);
-                }
-            } else if (strcmp(input_args[i][0], "||") == 0) {
-                const char* args[] = {
-                    input_args[i][1], // argv[0] is the string used to execute the program
-                    input_args[i][2],
-                    nullptr
-                };
-                if (WIFEXITED(status) == 0 || WEXITSTATUS(status)) {
-                    int r = execvp(args[0], (char**) args);
 
-                }
-            } else if (strcmp(input_args[i][0], ";") == 0)  {
-                const char* args[] = {
-                    input_args[i][1], // argv[0] is the string used to execute the program
-                    input_args[i][2],
-                    nullptr
-                };
-                int j = 1;
-                // while (input_args[i][j] != nullptr) {
-                //     strcpy(args[j - 1], input_args[i][j]);
-                //    //  printf("%d: %s\n", j - 1, args[j - 1]);
-                //     j++;
-
-                // }
-                // args[j] = nullptr;
-                // for(int mm = 0; mm < 3; mm++) {
-                //     printf("%d: %s\n", mm, args[mm]);
-                // }
-                execvp(args[0], (char**) args);
-
-            } else {
-                int r = execvp(input_args[i][0], (char**) input_args[i]);
+        if (strcmp(input_args[i][0], "&&") == 0) {
+            const char* args[] = {
+                input_args[i][1], // argv[0] is the string used to execute the program
+                input_args[i][2],
+                input_args[i][3],
+                nullptr
+            };
+            if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+                pid_t p = fork();
+                // int r = execvp(args[0], (char**) args);
+                pid_t exited_pid = waitpid(p, &status, 0);
             }
+        } else if (strcmp(input_args[i][0], "||") == 0) {
+            const char* args[] = {
+                input_args[i][1], // argv[0] is the string used to execute the program
+                input_args[i][2],
+                nullptr
+            };
+            if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+                pid_t p = fork();
+                // int r = execvp(args[0], (char**) args);
+                pid_t exited_pid = waitpid(p, &status, 0);
+            }
+        } else if (strcmp(input_args[i][0], ";") == 0)  {
+            const char* args[] = {
+                input_args[i][1], // argv[0] is the string used to execute the program
+                input_args[i][2],
+                nullptr
+            };
+            pid_t p = fork();
+            // execvp(args[0], (char**) args);
+            pid_t exited_pid = waitpid(p, &status, 0);
         } else {
-            // fprintf(stderr, "Child pid %d should exec sth.\n", p);
+            pid_t p = fork();
+            // int r = execvp(input_args[i][0], (char**) input_args[i]);
+            fprintf(stderr, "k: %d \n", k);
+            pid_t exited_pid = waitpid(p, &status, 0);
         }
-
-        pid_t exited_pid = waitpid(p, &status, 0);
         // printf("WIFEXITED: %d, WEXITSTATUS: %d\n", WIFEXITED(status), WEXITSTATUS(status));
         // assert(exited_pid == p);
     }
-
 }
 
 

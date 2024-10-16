@@ -38,6 +38,7 @@ command::command() {
 
 command::~command() {
 }
+int status = 0;
 
 
 // COMMAND EXECUTION
@@ -84,10 +85,10 @@ void command::run() {
         input_args[k][m++] = this->args[i].c_str();
     }
     input_args[k++][m] = nullptr; 
-    int status;
+
 
     //Note that the last element of the vector must be a `nullptr`
-    for (int i = 0; i < k; i++) {
+    for (int i = 0; i < 0; i++) {
 
         if (strcmp(input_args[i][0], "&&") == 0) {
             const char* args[] = {
@@ -98,7 +99,9 @@ void command::run() {
             };
             if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
                 pid_t p = fork();
-                // int r = execvp(args[0], (char**) args);
+                if (p == 0) {
+                    int r = execvp(input_args[i][0], (char**) input_args[i]);
+                }
                 pid_t exited_pid = waitpid(p, &status, 0);
             }
         } else if (strcmp(input_args[i][0], "||") == 0) {
@@ -109,7 +112,9 @@ void command::run() {
             };
             if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
                 pid_t p = fork();
-                // int r = execvp(args[0], (char**) args);
+                if (p == 0) {
+                    int r = execvp(input_args[i][0], (char**) input_args[i]);
+                }
                 pid_t exited_pid = waitpid(p, &status, 0);
             }
         } else if (strcmp(input_args[i][0], ";") == 0)  {
@@ -119,12 +124,17 @@ void command::run() {
                 nullptr
             };
             pid_t p = fork();
-            // execvp(args[0], (char**) args);
+            if (p == 0) {
+                int r = execvp(input_args[i][0], (char**) input_args[i]);
+            }
             pid_t exited_pid = waitpid(p, &status, 0);
         } else {
             pid_t p = fork();
-            // int r = execvp(input_args[i][0], (char**) input_args[i]);
             fprintf(stderr, "k: %d \n", k);
+            if (p == 0) {
+                int r = execvp(input_args[i][0], (char**) input_args[i]);
+
+            }
             pid_t exited_pid = waitpid(p, &status, 0);
         }
         // printf("WIFEXITED: %d, WEXITSTATUS: %d\n", WIFEXITED(status), WEXITSTATUS(status));
